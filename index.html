@@ -6,6 +6,7 @@
     <title>Udaan Vidhyalay - School Management System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       body {
         font-family: 'Inter', sans-serif;
@@ -38,6 +39,12 @@
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.3); 
       }
+      
+      /* Hide scrollbar for clean UI but keep functionality */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
     </style>
   <script type="importmap">
 {
@@ -45,8 +52,9 @@
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
   }
 }
@@ -54,5 +62,962 @@
 </head>
   <body>
     <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { GoogleGenAI } from "@google/genai";
+      import { 
+        LayoutDashboard, Users, Banknote, CheckSquare, FileSpreadsheet, 
+        LogOut, School, GraduationCap, X, ShieldCheck, Plus, Trash2, 
+        Edit, Save, Wand2, AlertCircle, Calendar, Download, Filter, 
+        CopyPlus, RotateCcw, Search, Lock, Sparkles, CheckCircle, 
+        XCircle, History, ChevronDown, ChevronUp, Printer, CreditCard, 
+        Wallet, Receipt, Calendar as CalendarIcon, BrainCircuit,
+        UserPlus, Phone, Mail, IndianRupee, Award, PieChart, Menu,
+        ChevronLeft, ChevronRight
+      } from 'lucide-react';
+      import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+
+      // --- TYPES ---
+      const View = {
+        DASHBOARD: 'DASHBOARD',
+        STUDENTS: 'STUDENTS',
+        TEACHERS: 'TEACHERS',
+        FEES: 'FEES',
+        ATTENDANCE: 'ATTENDANCE',
+        EXAMS: 'EXAMS',
+        SETTINGS: 'SETTINGS'
+      };
+
+      // --- SERVICES: DB ---
+      const STORAGE_KEYS = {
+        STUDENTS: 'uv_students_v1',
+        TEACHERS: 'uv_teachers_v1',
+        TEACHER_ATTENDANCE: 'uv_teacher_attendance_v1',
+        FEES: 'uv_fees_v1',
+        ATTENDANCE: 'uv_attendance_v1',
+        EXAMS: 'uv_exams_v1',
+      };
+
+      class DatabaseService {
+        getTeachers() {
+          const data = localStorage.getItem(STORAGE_KEYS.TEACHERS);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveTeacher(teacher) {
+          const teachers = this.getTeachers();
+          const existingIndex = teachers.findIndex(t => t.id === teacher.id);
+          if (existingIndex >= 0) {
+            teachers[existingIndex] = teacher;
+          } else {
+            teachers.push(teacher);
+          }
+          localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
+        }
+
+        deleteTeacher(id) {
+          const teachers = this.getTeachers().filter(t => t.id !== id);
+          localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
+        }
+
+        getTeacherAttendance() {
+          const data = localStorage.getItem(STORAGE_KEYS.TEACHER_ATTENDANCE);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveTeacherAttendance(record) {
+          const data = this.getTeacherAttendance();
+          const index = data.findIndex(d => d.id === record.id);
+          if (index >= 0) data[index] = record;
+          else data.push(record);
+          localStorage.setItem(STORAGE_KEYS.TEACHER_ATTENDANCE, JSON.stringify(data));
+        }
+
+        getTeacherCount() {
+          return this.getTeachers().length;
+        }
+
+        getStudents() {
+          const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveStudent(student) {
+          const students = this.getStudents();
+          const existingIndex = students.findIndex(s => s.id === student.id);
+          if (existingIndex >= 0) {
+            students[existingIndex] = student;
+          } else {
+            students.push(student);
+          }
+          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+        }
+
+        deleteStudent(id) {
+          const students = this.getStudents().filter(s => s.id !== id);
+          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+          this.cleanupRelatedRecords(id);
+        }
+
+        cleanupRelatedRecords(studentId) {
+          const fees = this.getFees().filter(f => f.studentId !== studentId);
+          localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(fees));
+          const att = this.getAttendance().filter(a => a.studentId !== studentId);
+          localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(att));
+          const exams = this.getExams().filter(e => e.studentId !== studentId);
+          localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(exams));
+        }
+
+        getNextRollNo() {
+          const students = this.getStudents();
+          if (students.length === 0) return 1001;
+          const maxRoll = Math.max(...students.map(s => s.rollNo));
+          return maxRoll + 1;
+        }
+
+        getFees() {
+          const data = localStorage.getItem(STORAGE_KEYS.FEES);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveFeeRecord(record) {
+          const fees = this.getFees();
+          const index = fees.findIndex(f => f.id === record.id);
+          if (index >= 0) fees[index] = record;
+          else fees.push(record);
+          localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(fees));
+        }
+
+        getAttendance() {
+          const data = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveAttendance(record) {
+          const data = this.getAttendance();
+          const index = data.findIndex(d => d.id === record.id);
+          if (index >= 0) data[index] = record;
+          else data.push(record);
+          localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(data));
+        }
+
+        getExams() {
+          const data = localStorage.getItem(STORAGE_KEYS.EXAMS);
+          return data ? JSON.parse(data) : [];
+        }
+
+        saveExamResult(result) {
+          const data = this.getExams();
+          const index = data.findIndex(d => d.id === result.id);
+          if (index >= 0) data[index] = result;
+          else data.push(result);
+          localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(data));
+        }
+
+        initializeData() {
+          if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
+              localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
+          }
+          if (!localStorage.getItem(STORAGE_KEYS.TEACHERS)) {
+              localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
+          }
+        }
+      }
+
+      const db = new DatabaseService();
+
+      // --- SERVICES: GEMINI ---
+      const getClient = () => {
+          let apiKey = '';
+          try {
+              // Try to get from process.env (handled by some bundlers) or window object if injected
+              // In this standalone HTML, we rely on it being available safely or user manually ensuring it.
+              // For Netlify, process.env is often replaced at build time, but here we are runtime.
+              // We will assume if it's missing, AI features degrade gracefully.
+              if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+                  apiKey = process.env.API_KEY;
+              }
+          } catch (e) {
+              console.warn("Environment variable access failed", e);
+          }
+
+          if (!apiKey) return null;
+          return new GoogleGenAI({ apiKey });
+      }
+
+      const generateStudentReport = async (student, exams, attendance) => {
+          const client = getClient();
+          if (!client) return "API Key is missing. Please configure the environment.";
+
+          const prompt = `
+          You are an expert academic counselor for 'Udaan Vidhyalay'.
+          Analyze the following student data and write a professional, encouraging, but honest 1-paragraph performance summary for their report card.
+          
+          Student: ${student.fullName} (Class: ${student.className}-${student.section})
+          
+          Academic Performance:
+          ${exams.map(e => `- ${e.subject} (${e.examType}): ${e.marksObtained}/${e.totalMarks}`).join('\n')}
+          
+          Attendance Records: ${attendance.length} records found.
+          (Assume general attendance is good unless specified otherwise).
+
+          The summary should mention their strengths based on high marks and areas for improvement based on low marks.
+          `;
+
+          try {
+              const response = await client.models.generateContent({
+                  model: "gemini-2.5-flash",
+                  contents: prompt,
+              });
+              return response.text || "No report generated.";
+          } catch (error) {
+              console.error("Gemini Error:", error);
+              return "Error communicating with AI service. Please try again later.";
+          }
+      };
+
+      const generateAttendanceAnalysis = async (records, totalStudents) => {
+          const client = getClient();
+          if (!client) return "API Key is missing.";
+
+          const presentCount = records.filter(r => r.status === 'Present').length;
+          const absentCount = records.filter(r => r.status === 'Absent').length;
+          const lateCount = records.filter(r => r.status === 'Late').length;
+
+          // Group by date to find trends
+          const dateMap = {};
+          records.forEach(r => {
+              if(!dateMap[r.date]) dateMap[r.date] = { P: 0, A: 0 };
+              if(r.status === 'Present') dateMap[r.date].P++;
+              if(r.status === 'Absent') dateMap[r.date].A++;
+          });
+
+          const prompt = `
+          You are a school administrator analyst. Analyze the following attendance data for 'Udaan Vidhyalay'.
+          
+          Total Records Scanned: ${records.length}
+          Total Students in DB: ${totalStudents}
+          
+          Summary:
+          - Present: ${presentCount}
+          - Absent: ${absentCount}
+          - Late: ${lateCount}
+          
+          Daily Breakdown (Sample):
+          ${JSON.stringify(Object.entries(dateMap).slice(0, 5))}
+          
+          Please provide a 3-bullet point analysis:
+          1. Overall Attendance Health (Excellent/Good/Poor).
+          2. A specific observation (e.g., "High absenteeism observed on...").
+          3. One actionable suggestion for improvement.
+          Keep it concise and professional.
+          `;
+
+          try {
+              const response = await client.models.generateContent({
+                  model: "gemini-2.5-flash",
+                  contents: prompt,
+              });
+              return response.text || "Analysis failed.";
+          } catch (error) {
+              return "Error generating AI analysis.";
+          }
+      }
+
+      // --- COMPONENTS ---
+
+      // 1. Login Component
+      const Login = ({ onLogin }) => {
+        const [username, setUsername] = useState('');
+        const [password, setPassword] = useState('');
+        const [error, setError] = useState('');
+
+        const handleLogin = (e) => {
+          e.preventDefault();
+          if (username === 'admin' && password === '1234') {
+            onLogin();
+          } else {
+            setError('Invalid Credentials');
+          }
+        };
+
+        return (
+          <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+            <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl w-full max-w-md z-10">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-300 mb-4 border border-indigo-500/30 shadow-inner">
+                  <ShieldCheck size={32} />
+                </div>
+                <h1 className="text-3xl font-bold text-white tracking-tight">Udaan Vidhyalay</h1>
+                <p className="text-zinc-300 mt-2 font-light">School Management Software</p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Admin ID</label>
+                  <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="block w-full px-4 py-3 border border-white/10 rounded-lg leading-5 bg-white/5 text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
+                      placeholder="Enter Admin ID"
+                      autoComplete="off"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Password</label>
+                  <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full px-4 py-3 border border-white/10 rounded-lg leading-5 bg-white/5 text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm transition duration-150 ease-in-out"
+                      placeholder="Enter Password"
+                      autoComplete="new-password"
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-red-500/20 text-red-200 text-sm p-3 rounded-md text-center border border-red-500/30 backdrop-blur-sm">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg transition-all transform hover:scale-[1.02]"
+                >
+                  Secure Login
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      };
+
+      // 2. Sidebar Component
+      const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose }) => {
+        const menuItems = [
+          { id: View.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
+          { id: View.STUDENTS, label: 'Students', icon: Users },
+          { id: View.TEACHERS, label: 'Teachers', icon: GraduationCap },
+          { id: View.FEES, label: 'Fees Management', icon: Banknote },
+          { id: View.ATTENDANCE, label: 'Attendance', icon: CheckSquare },
+          { id: View.EXAMS, label: 'Exam Results', icon: FileSpreadsheet },
+        ];
+
+        const handleNavigation = (view) => {
+          onChangeView(view);
+          onClose();
+        };
+
+        return (
+          <>
+            {isOpen && (
+              <div 
+                  className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm transition-opacity"
+                  onClick={onClose}
+              />
+            )}
+            <div className={`
+              fixed top-0 left-0 h-full w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 text-white shadow-2xl z-40 
+              transition-transform duration-300 ease-in-out transform 
+              ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
+              md:translate-x-0 md:z-20
+            `}>
+              <div className="p-6 border-b border-white/10 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-900/40">
+                      <School size={24} className="text-white" />
+                  </div>
+                  <div>
+                      <h2 className="font-bold text-lg leading-tight">Udaan</h2>
+                      <span className="text-xs text-zinc-400 uppercase tracking-wider">Vidhyalay</span>
+                  </div>
+                </div>
+                <button onClick={onClose} className="md:hidden text-zinc-400 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
+                {menuItems.map((item) => {
+                    const isActive = currentView === item.id;
+                    const Icon = item.icon;
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => handleNavigation(item.id)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                                isActive 
+                                ? 'bg-indigo-600/80 text-white shadow-lg shadow-indigo-900/20 backdrop-blur-sm' 
+                                : 'text-zinc-400 hover:bg-white/10 hover:text-white'
+                            }`}
+                        >
+                            <Icon size={20} />
+                            <span className="font-medium">{item.label}</span>
+                        </button>
+                    );
+                })}
+              </nav>
+
+              <div className="p-4 border-t border-white/10">
+                <button
+                  onClick={onLogout}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-lg transition-colors"
+                >
+                  <LogOut size={20} />
+                  <span className="font-medium">Logout</span>
+                </button>
+              </div>
+            </div>
+          </>
+        );
+      };
+
+      // 3. Student Manager Component
+      const StudentManager = () => {
+        const [students, setStudents] = useState([]);
+        const [viewMode, setViewMode] = useState('LIST');
+        const [searchTerm, setSearchTerm] = useState('');
+        const [filterClass, setFilterClass] = useState('');
+        const [filterSection, setFilterSection] = useState('');
+        const [isEdit, setIsEdit] = useState(false);
+        const [aiLoading, setAiLoading] = useState(false);
+        const [aiReport, setAiReport] = useState(null);
+        const [errors, setErrors] = useState({});
+        const [touched, setTouched] = useState({});
+        const [saveAction, setSaveAction] = useState('SAVE');
+
+        const initialFormState = {
+          id: '', rollNo: 0, fullName: '', gender: 'Male', dateOfBirth: '',
+          contactNumber: '', address: '', className: '', section: '',
+          admissionDate: new Date().toISOString().split('T')[0]
+        };
+        const [formData, setFormData] = useState(initialFormState);
+
+        useEffect(() => { loadStudents(); }, []);
+
+        const loadStudents = () => setStudents(db.getStudents());
+
+        const resetFormState = () => { setErrors({}); setTouched({}); setAiReport(null); };
+
+        const generateNewCredentials = () => {
+          const nextRoll = db.getNextRollNo();
+          const year = new Date().getFullYear();
+          return { id: `UV-${year}-${nextRoll}`, rollNo: nextRoll };
+        };
+
+        const handleAddNew = () => {
+          const creds = generateNewCredentials();
+          setFormData({ ...initialFormState, ...creds });
+          setIsEdit(false);
+          resetFormState();
+          setViewMode('FORM');
+        };
+
+        const handleEdit = (student) => {
+          setFormData(student);
+          setIsEdit(true);
+          resetFormState();
+          setViewMode('FORM');
+        };
+
+        const handleDelete = (id) => {
+          if (window.confirm('Delete student? Records will be lost.')) {
+            db.deleteStudent(id);
+            loadStudents();
+          }
+        };
+
+        const validateField = (name, value, currentData) => {
+            switch (name) {
+                case 'id': if (!value) return 'Required'; return '';
+                case 'rollNo': if (!value || isNaN(value) || value <= 0) return 'Valid roll no required'; return '';
+                case 'fullName': if (!value || value.length < 3) return 'Min 3 chars'; return '';
+                case 'contactNumber': if (!/^[6-9]\d{9}$/.test(value)) return 'Valid 10-digit Indian mobile'; return '';
+                case 'className': case 'section': case 'gender': case 'dateOfBirth': case 'admissionDate': if (!value) return 'Required'; return '';
+                case 'address': if (!value || value.length < 10) return 'Min 10 chars'; return '';
+                default: return '';
+            }
+        };
+
+        const handleFieldChange = (name, value) => {
+            const processed = name === 'rollNo' ? (value === '' ? '' : Number(value)) : value;
+            const newData = { ...formData, [name]: processed };
+            setFormData(newData);
+            if (touched[name]) setErrors(prev => ({ ...prev, [name]: validateField(name, processed, newData) }));
+        };
+
+        const handleSave = (e) => {
+            e.preventDefault();
+            const newErrors = {};
+            let isValid = true;
+            ['id', 'rollNo', 'fullName', 'contactNumber', 'className', 'section', 'dateOfBirth', 'admissionDate', 'address', 'gender'].forEach(f => {
+                const err = validateField(f, formData[f], formData);
+                if (err) { newErrors[f] = err; isValid = false; }
+            });
+            setErrors(newErrors);
+            setTouched(Object.keys(initialFormState).reduce((acc, k) => ({...acc, [k]: true}), {}));
+            if (!isValid) return;
+
+            db.saveStudent(formData);
+            loadStudents();
+            if (saveAction === 'SAVE_AND_NEW' && !isEdit) {
+                const creds = generateNewCredentials();
+                setFormData({...initialFormState, ...creds});
+                resetFormState();
+            } else {
+                setViewMode('LIST');
+            }
+        };
+
+        const handleGenerateAIReport = async () => {
+            setAiLoading(true);
+            const exams = db.getExams().filter(e => e.studentId === formData.id);
+            const attendance = db.getAttendance().filter(a => a.studentId === formData.id);
+            const report = await generateStudentReport(formData, exams, attendance);
+            setAiReport(report);
+            setAiLoading(false);
+        };
+
+        const filteredStudents = students.filter(s => {
+            const matchesSearch = s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || s.rollNo.toString().includes(searchTerm);
+            const matchesClass = filterClass ? String(s.className) === String(filterClass) : true;
+            const matchesSection = filterSection ? s.section === filterSection : true;
+            return matchesSearch && matchesClass && matchesSection;
+        });
+
+        if (viewMode === 'LIST') {
+            return (
+                <div className="bg-black/40 backdrop-blur-xl rounded-xl shadow-lg border border-white/10 overflow-hidden h-full flex flex-col">
+                    <div className="p-4 border-b border-white/10 flex flex-col gap-4">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-white">Student Directory</h2>
+                            <button onClick={handleAddNew} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                                <Plus size={18} /> <span className="hidden sm:inline">Add Student</span>
+                            </button>
+                        </div>
+                        <div className="flex gap-3">
+                             <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 w-full outline-none" />
+                        </div>
+                    </div>
+                    <div className="overflow-auto flex-1 custom-scrollbar">
+                         <table className="w-full text-left text-sm text-zinc-300">
+                            <thead className="bg-white/5 text-zinc-200 font-semibold sticky top-0 backdrop-blur-md">
+                                <tr>
+                                    <th className="px-6 py-4">ID</th><th className="px-6 py-4">Roll</th><th className="px-6 py-4">Name</th><th className="px-6 py-4">Class</th><th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {filteredStudents.map(s => (
+                                    <tr key={s.id} className="hover:bg-white/5">
+                                        <td className="px-6 py-4 text-zinc-500">{s.id}</td>
+                                        <td className="px-6 py-4 text-indigo-300">#{s.rollNo}</td>
+                                        <td className="px-6 py-4 text-white">{s.fullName}</td>
+                                        <td className="px-6 py-4">{s.className}-{s.section}</td>
+                                        <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                            <button onClick={() => handleEdit(s)} className="text-blue-300 p-1"><Edit size={18} /></button>
+                                            <button onClick={() => handleDelete(s.id)} className="text-red-300 p-1"><Trash2 size={18} /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                         </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // Form Render (Simplified for single file brevity)
+        return (
+            <div className="max-w-4xl mx-auto h-full overflow-y-auto custom-scrollbar p-2">
+                <div className="bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 p-6">
+                    <div className="flex justify-between mb-6">
+                        <h2 className="text-xl font-bold text-white">{isEdit ? 'Edit Student' : 'New Student'}</h2>
+                        <button onClick={() => setViewMode('LIST')} className="text-zinc-400"><X size={24}/></button>
+                    </div>
+                    <form className="grid md:grid-cols-2 gap-4">
+                        <input className="p-3 bg-white/5 border border-white/10 rounded text-white" placeholder="Full Name" value={formData.fullName} onChange={e => handleFieldChange('fullName', e.target.value)} />
+                        <input className="p-3 bg-white/5 border border-white/10 rounded text-white" type="number" placeholder="Roll No" value={formData.rollNo} onChange={e => handleFieldChange('rollNo', e.target.value)} />
+                        <input className="p-3 bg-white/5 border border-white/10 rounded text-white" placeholder="Contact" value={formData.contactNumber} onChange={e => handleFieldChange('contactNumber', e.target.value)} />
+                        <div className="flex gap-2">
+                             <select className="p-3 bg-white/5 border border-white/10 rounded text-white flex-1 [&>option]:bg-zinc-900" value={formData.className} onChange={e => handleFieldChange('className', e.target.value)}>
+                                 <option value="">Class</option>{[...Array(12)].map((_,i) => <option key={i} value={i+1}>{i+1}</option>)}
+                             </select>
+                             <select className="p-3 bg-white/5 border border-white/10 rounded text-white flex-1 [&>option]:bg-zinc-900" value={formData.section} onChange={e => handleFieldChange('section', e.target.value)}>
+                                 <option value="">Sec</option>{['A','B','C','D'].map(s => <option key={s} value={s}>{s}</option>)}
+                             </select>
+                        </div>
+                        <select className="p-3 bg-white/5 border border-white/10 rounded text-white [&>option]:bg-zinc-900" value={formData.gender} onChange={e => handleFieldChange('gender', e.target.value)}>
+                             <option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+                        </select>
+                        <input className="p-3 bg-white/5 border border-white/10 rounded text-white [color-scheme:dark]" type="date" placeholder="DOB" value={formData.dateOfBirth} onChange={e => handleFieldChange('dateOfBirth', e.target.value)} />
+                        <input className="p-3 bg-white/5 border border-white/10 rounded text-white [color-scheme:dark]" type="date" placeholder="Admission Date" value={formData.admissionDate} onChange={e => handleFieldChange('admissionDate', e.target.value)} />
+                        <textarea className="md:col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white" placeholder="Address" rows="3" value={formData.address} onChange={e => handleFieldChange('address', e.target.value)}></textarea>
+                        
+                        <div className="md:col-span-2 flex gap-4 mt-4">
+                            <button onClick={handleSave} className="flex-1 bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700">Save Student</button>
+                        </div>
+                    </form>
+                    
+                    {isEdit && (
+                        <div className="mt-8 p-4 bg-indigo-900/20 rounded-xl border border-indigo-500/20">
+                             <div className="flex justify-between items-center mb-4">
+                                 <h3 className="text-white font-bold flex items-center gap-2"><Sparkles size={18} className="text-purple-400"/> AI Report</h3>
+                                 <button onClick={handleGenerateAIReport} disabled={aiLoading} className="bg-purple-600 text-white px-4 py-2 rounded text-sm">{aiLoading ? 'Analyzing...' : 'Generate'}</button>
+                             </div>
+                             {aiReport && <p className="text-zinc-300 text-sm italic bg-black/20 p-4 rounded">{aiReport}</p>}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+      };
+
+      // 4. Fees Manager Component (Enhanced)
+      const FeesManager = () => {
+        const [students, setStudents] = useState([]);
+        const [fees, setFees] = useState([]);
+        const SEMESTER_FEE = 11000;
+        const [showModal, setShowModal] = useState(false);
+        const [selectedPay, setSelectedPay] = useState(null);
+        const [payForm, setPayForm] = useState({ amount: 0, mode: 'CASH' });
+
+        useEffect(() => { loadData(); }, []);
+        const loadData = () => { setStudents(db.getStudents()); setFees(db.getFees()); };
+        
+        const getRecord = (sid) => fees.find(f => f.studentId === sid) || { id: `${sid}-23`, studentId: sid, transactions: [] };
+        const getStats = (rec, sem) => {
+            const paid = (rec.transactions || []).filter(t => t.semester === sem).reduce((s, t) => s + t.amount, 0);
+            const due = SEMESTER_FEE - paid;
+            return { paid, due, status: paid >= SEMESTER_FEE ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING' };
+        };
+
+        const handlePay = (s, sem) => {
+            const rec = getRecord(s.id);
+            const stats = getStats(rec, sem);
+            if (stats.status === 'PAID') return alert("Already Paid");
+            setSelectedPay({ s, sem, due: stats.due });
+            setPayForm({ amount: stats.due, mode: 'CASH' });
+            setShowModal(true);
+        };
+
+        const processPay = (e) => {
+            e.preventDefault();
+            const rec = getRecord(selectedPay.s.id);
+            const txn = { 
+                id: `TXN-${Date.now()}`, date: new Date().toISOString().split('T')[0], 
+                amount: payForm.amount, type: payForm.mode, semester: selectedPay.sem 
+            };
+            const newRec = { ...rec, transactions: [...(rec.transactions || []), txn] };
+            // Update boolean flags for legacy support
+            const s1 = getStats(newRec, 1);
+            const s2 = getStats(newRec, 2);
+            newRec.semester1Paid = s1.status === 'PAID';
+            newRec.semester2Paid = s2.status === 'PAID';
+            
+            db.saveFeeRecord(newRec);
+            loadData();
+            setShowModal(false);
+        };
+
+        return (
+             <div className="bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 h-full flex flex-col">
+                 <div className="p-6 border-b border-white/10"><h2 className="text-xl font-bold text-white">Fees Management</h2></div>
+                 <div className="overflow-auto flex-1 custom-scrollbar">
+                     <table className="w-full text-left text-sm text-zinc-300">
+                        <thead className="bg-white/5 text-zinc-200 font-semibold sticky top-0">
+                            <tr><th className="px-6 py-4">Student</th><th className="px-6 py-4 text-center">Sem 1</th><th className="px-6 py-4 text-center">Sem 2</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {students.map(s => {
+                                const rec = getRecord(s.id);
+                                const s1 = getStats(rec, 1);
+                                const s2 = getStats(rec, 2);
+                                const Btn = ({ stats, sem }) => (
+                                    <button onClick={() => handlePay(s, sem)} className={`px-3 py-1 rounded-full text-xs font-bold w-24 ${stats.status === 'PAID' ? 'bg-green-500/20 text-green-300' : stats.status === 'PARTIAL' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-white/10 text-zinc-400 hover:bg-indigo-600 hover:text-white'}`}>
+                                        {stats.status === 'PAID' ? 'PAID' : stats.status === 'PARTIAL' ? `Due: ${stats.due}` : 'PAY'}
+                                    </button>
+                                );
+                                return (
+                                    <tr key={s.id} className="hover:bg-white/5">
+                                        <td className="px-6 py-4"><div className="text-white font-medium">{s.fullName}</div><div className="text-xs text-zinc-500">#{s.rollNo}</div></td>
+                                        <td className="px-6 py-4 text-center"><Btn stats={s1} sem={1}/></td>
+                                        <td className="px-6 py-4 text-center"><Btn stats={s2} sem={2}/></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                     </table>
+                 </div>
+                 {showModal && (
+                     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                         <form onSubmit={processPay} className="bg-zinc-900 border border-white/10 p-6 rounded-xl w-full max-w-sm space-y-4">
+                             <h3 className="text-white font-bold">Collect Fee: Sem {selectedPay.sem}</h3>
+                             <p className="text-zinc-400 text-sm">Student: {selectedPay.s.fullName}</p>
+                             <div className="bg-white/5 p-3 rounded flex justify-between text-sm text-zinc-300"><span>Due:</span> <span className="text-red-400 font-bold">₹{selectedPay.due}</span></div>
+                             <input type="number" max={selectedPay.due} min="1" value={payForm.amount} onChange={e => setPayForm({...payForm, amount: Number(e.target.value)})} className="w-full p-3 rounded bg-black/20 border border-white/10 text-white" />
+                             <select value={payForm.mode} onChange={e => setPayForm({...payForm, mode: e.target.value})} className="w-full p-3 rounded bg-white/5 border border-white/10 text-white [&>option]:bg-zinc-900">
+                                 <option value="CASH">Cash</option><option value="UPI">UPI</option>
+                             </select>
+                             <div className="flex gap-2"><button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 border border-white/10 rounded text-zinc-300">Cancel</button><button type="submit" className="flex-1 py-2 bg-green-600 rounded text-white font-bold">Pay</button></div>
+                         </form>
+                     </div>
+                 )}
+             </div>
+        );
+      };
+
+      // 5. Attendance Manager
+      const AttendanceManager = () => {
+          const [students, setStudents] = useState([]);
+          const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+          const [map, setMap] = useState({});
+          const [aiResult, setAiResult] = useState(null);
+
+          useEffect(() => { 
+              setStudents(db.getStudents()); 
+              const recs = db.getAttendance().filter(r => r.date === date);
+              const m = {}; recs.forEach(r => m[r.studentId] = r.status);
+              setMap(m);
+          }, [date]);
+
+          const mark = (sid, status) => {
+              const newMap = { ...map, [sid]: status };
+              setMap(newMap);
+              db.saveAttendance({ id: `${sid}-${date}`, studentId: sid, date, status });
+          };
+
+          const handleAI = async () => {
+              const res = await generateAttendanceAnalysis(db.getAttendance(), students.length);
+              setAiResult(res);
+          };
+
+          return (
+              <div className="bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 h-full flex flex-col">
+                  <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                      <h2 className="text-xl font-bold text-white">Attendance</h2>
+                      <div className="flex gap-2">
+                          <button onClick={handleAI} className="bg-purple-600 text-white px-3 py-1 rounded text-sm flex items-center gap-2"><BrainCircuit size={16}/> AI Insights</button>
+                          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white/5 border border-white/10 rounded p-1 text-white [color-scheme:dark]" />
+                      </div>
+                  </div>
+                  {aiResult && <div className="p-4 bg-purple-900/20 text-zinc-300 text-sm whitespace-pre-line relative"><button onClick={() => setAiResult(null)} className="absolute top-2 right-2 text-xs text-zinc-500">x</button>{aiResult}</div>}
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto flex-1 custom-scrollbar">
+                      {students.map(s => (
+                          <div key={s.id} className="bg-white/5 border border-white/10 p-3 rounded-lg">
+                              <div className="flex justify-between mb-2"><span className="text-white font-medium">{s.fullName}</span><span className="text-xs text-zinc-500">#{s.rollNo}</span></div>
+                              <div className="flex gap-1">
+                                  {['Present', 'Absent'].map(st => (
+                                      <button key={st} onClick={() => mark(s.id, st)} className={`flex-1 py-1 rounded text-xs ${map[s.id] === st ? (st === 'Present' ? 'bg-green-600 text-white' : 'bg-red-600 text-white') : 'bg-black/20 text-zinc-500'}`}>{st}</button>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          );
+      };
+
+      // 6. Exam Manager
+      const ExamManager = () => {
+          const [students, setStudents] = useState([]);
+          const [results, setResults] = useState({});
+          useEffect(() => {
+             const s = db.getStudents();
+             setStudents(s);
+             const all = db.getExams();
+             const map = {};
+             s.forEach(st => {
+                 const found = all.find(e => e.studentId === st.id && e.subject === 'Mathematics');
+                 if(found) map[st.id] = found.marksObtained;
+             });
+             setResults(map);
+          }, []);
+
+          const save = () => {
+              students.forEach(s => {
+                  if(results[s.id]) db.saveExamResult({ id: `${s.id}-Math`, studentId: s.id, subject: 'Mathematics', examType: 'Final', marksObtained: Number(results[s.id]), totalMarks: 100 });
+              });
+              alert("Saved Mathematics Results");
+          };
+
+          return (
+              <div className="bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 h-full flex flex-col p-6">
+                  <div className="flex justify-between mb-6"><h2 className="text-xl font-bold text-white">Exam Results (Math)</h2><button onClick={save} className="bg-indigo-600 text-white px-4 py-2 rounded">Save Results</button></div>
+                  <div className="overflow-auto flex-1 custom-scrollbar">
+                      <table className="w-full text-left text-sm text-zinc-300">
+                          <thead className="bg-white/5 text-zinc-200"><tr><th className="p-4">Student</th><th className="p-4">Marks (100)</th></tr></thead>
+                          <tbody className="divide-y divide-white/5">
+                              {students.map(s => (
+                                  <tr key={s.id}>
+                                      <td className="p-4 text-white">{s.fullName}</td>
+                                      <td className="p-4"><input type="number" className="bg-black/20 border border-white/10 rounded w-20 p-2 text-white" value={results[s.id] || ''} onChange={e => setResults({...results, [s.id]: e.target.value})} /></td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+      };
+
+      // 7. Teacher Manager
+      const TeacherManager = () => {
+          const [teachers, setTeachers] = useState([]);
+          const [showForm, setShowForm] = useState(false);
+          const [form, setForm] = useState({ fullName: '', subject: '', salary: 0 });
+          useEffect(() => setTeachers(db.getTeachers()), []);
+          
+          const save = (e) => {
+              e.preventDefault();
+              db.saveTeacher({ ...form, id: Date.now().toString(), joinDate: '2023-01-01' });
+              setTeachers(db.getTeachers()); setShowForm(false);
+          };
+          
+          return (
+              <div className="bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 h-full p-6 relative">
+                   <div className="flex justify-between mb-6"><h2 className="text-xl font-bold text-white">Teachers</h2><button onClick={() => setShowForm(true)} className="bg-indigo-600 text-white px-4 py-2 rounded">Add Teacher</button></div>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                       {teachers.map(t => (
+                           <div key={t.id} className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                               <h3 className="text-white font-bold">{t.fullName}</h3>
+                               <p className="text-indigo-300 text-xs mb-2">{t.subject}</p>
+                               <p className="text-zinc-400 text-xs">Salary: ₹{t.salary}</p>
+                           </div>
+                       ))}
+                   </div>
+                   {showForm && (
+                       <div className="absolute inset-0 bg-black/90 flex items-center justify-center p-4 z-20">
+                           <form onSubmit={save} className="bg-zinc-900 border border-white/10 p-6 rounded-xl w-full max-w-sm space-y-4">
+                               <h3 className="text-white">Add Teacher</h3>
+                               <input placeholder="Name" className="w-full p-2 bg-white/5 border border-white/10 rounded text-white" onChange={e => setForm({...form, fullName: e.target.value})} />
+                               <input placeholder="Subject" className="w-full p-2 bg-white/5 border border-white/10 rounded text-white" onChange={e => setForm({...form, subject: e.target.value})} />
+                               <input placeholder="Salary" type="number" className="w-full p-2 bg-white/5 border border-white/10 rounded text-white" onChange={e => setForm({...form, salary: Number(e.target.value)})} />
+                               <div className="flex gap-2"><button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-white/10 rounded text-zinc-300 py-2">Cancel</button><button className="flex-1 bg-indigo-600 rounded text-white py-2">Save</button></div>
+                           </form>
+                       </div>
+                   )}
+              </div>
+          );
+      };
+
+      // 8. Dashboard Home
+      const DashboardHome = ({ stats, onNavigate }) => {
+          const pieData = [{ name: 'Boys', value: stats.genderStats?.male || 0 }, { name: 'Girls', value: stats.genderStats?.female || 0 }];
+          const COLORS = ['#6366f1', '#ec4899'];
+          
+          const StatCard = ({ title, value, icon: Icon, color }) => (
+              <div className="bg-black/40 backdrop-blur-xl p-6 rounded-xl shadow-lg border border-white/10 flex items-center gap-4">
+                  <div className={`${color} p-3 rounded-lg text-white`}><Icon size={20} /></div>
+                  <div><p className="text-zinc-400 text-xs">{title}</p><h3 className="text-lg font-bold text-white">{value}</h3></div>
+              </div>
+          );
+
+          return (
+              <div className="space-y-6 overflow-y-auto h-full pb-20 custom-scrollbar">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <StatCard title="Students" value={stats.totalStudents} icon={Users} color="bg-indigo-600" />
+                      <StatCard title="Teachers" value={stats.totalTeachers} icon={GraduationCap} color="bg-teal-600" />
+                      <StatCard title="Revenue" value={`₹${stats.totalRevenue}`} icon={IndianRupee} color="bg-green-600" />
+                      <StatCard title="Present" value={stats.attendanceToday} icon={CheckSquare} color="bg-orange-600" />
+                      <StatCard title="Pass Rate" value={`${stats.passPercentage}%`} icon={Award} color="bg-purple-600" />
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                       <div className="lg:col-span-2 bg-black/40 backdrop-blur-xl p-6 rounded-xl border border-white/10">
+                           <h3 className="text-white font-bold mb-4">Quick Shortcuts</h3>
+                           <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+                               {[
+                                   { l: 'Admission', i: Users, v: View.STUDENTS, c: 'indigo' },
+                                   { l: 'Teachers', i: GraduationCap, v: View.TEACHERS, c: 'teal' },
+                                   { l: 'Fees', i: IndianRupee, v: View.FEES, c: 'green' },
+                                   { l: 'Attendance', i: CheckSquare, v: View.ATTENDANCE, c: 'orange' },
+                                   { l: 'Results', i: Award, v: View.EXAMS, c: 'purple' }
+                               ].map(x => (
+                                   <div key={x.l} onClick={() => onNavigate(x.v)} className="bg-white/5 hover:bg-white/10 p-4 rounded-lg border border-white/5 cursor-pointer flex flex-col items-center text-center">
+                                       <div className={`text-${x.c}-300 mb-2`}><x.i size={24}/></div>
+                                       <span className="text-xs text-zinc-300">{x.l}</span>
+                                   </div>
+                               ))}
+                           </div>
+                       </div>
+                       <div className="bg-black/40 backdrop-blur-xl p-6 rounded-xl border border-white/10 flex flex-col h-64">
+                           <h3 className="text-white font-bold mb-2">Demographics</h3>
+                           <ResponsiveContainer width="100%" height="100%">
+                               <RePieChart>
+                                   <Pie data={pieData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value" stroke="none">
+                                       {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                   </Pie>
+                                   <Tooltip contentStyle={{backgroundColor: '#000', borderColor: '#333', borderRadius: '8px'}}/>
+                               </RePieChart>
+                           </ResponsiveContainer>
+                           <div className="flex justify-center gap-4 text-xs text-zinc-400">
+                               <span className="flex items-center gap-1"><div className="w-2 h-2 bg-indigo-500 rounded-full"></div> Boys ({stats.genderStats?.male})</span>
+                               <span className="flex items-center gap-1"><div className="w-2 h-2 bg-pink-500 rounded-full"></div> Girls ({stats.genderStats?.female})</span>
+                           </div>
+                       </div>
+                  </div>
+              </div>
+          );
+      };
+
+      // 9. Main App & Dashboard Shell
+      const App = () => {
+          const [isAuthenticated, setIsAuthenticated] = useState(false);
+          const [view, setView] = useState(View.DASHBOARD);
+          const [sidebarOpen, setSidebarOpen] = useState(false);
+          const [stats, setStats] = useState({ totalStudents: 0, totalTeachers: 0, totalRevenue: 0, attendanceToday: 0, passPercentage: 0, genderStats: { male: 0, female: 0 }});
+
+          useEffect(() => {
+              db.initializeData();
+              const timer = setInterval(() => {
+                  const s = db.getStudents();
+                  const f = db.getFees();
+                  const a = db.getAttendance();
+                  const e = db.getExams();
+                  const t = db.getTeachers();
+                  const rev = f.reduce((acc, r) => acc + (r.semester1Paid ? 11000 : 0) + (r.semester2Paid ? 11000 : 0), 0);
+                  const today = new Date().toISOString().split('T')[0];
+                  const att = a.filter(r => r.date === today && r.status === 'Present').length;
+                  const pass = e.length > 0 ? Math.round((e.filter(x => x.marksObtained >= 40).length / e.length) * 100) : 0;
+                  setStats({
+                      totalStudents: s.length, totalTeachers: t.length, totalRevenue: rev, attendanceToday: att, passPercentage: pass,
+                      genderStats: { male: s.filter(x => x.gender === 'Male').length, female: s.filter(x => x.gender === 'Female').length }
+                  });
+              }, 2000);
+              return () => clearInterval(timer);
+          }, []);
+
+          if (!isAuthenticated) return <Login onLogin={() => setIsAuthenticated(true)} />;
+
+          return (
+              <div className="flex min-h-screen text-zinc-100">
+                  <Sidebar currentView={view} onChangeView={setView} onLogout={() => setIsAuthenticated(false)} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+                  <main className={`flex-1 p-4 md:p-8 h-screen flex flex-col transition-all duration-300 md:ml-64`}>
+                       <header className="flex justify-between items-center mb-6 shrink-0">
+                           <div className="flex items-center gap-4">
+                               <button onClick={() => setSidebarOpen(true)} className="md:hidden text-zinc-300"><Menu size={24}/></button>
+                               <h1 className="text-2xl font-bold text-white">{view === View.DASHBOARD ? 'Overview' : view.charAt(0) + view.slice(1).toLowerCase()}</h1>
+                           </div>
+                       </header>
+                       <div className="flex-1 overflow-hidden relative">
+                           {view === View.DASHBOARD && <DashboardHome stats={stats} onNavigate={setView} />}
+                           {view === View.STUDENTS && <StudentManager />}
+                           {view === View.TEACHERS && <TeacherManager />}
+                           {view === View.FEES && <FeesManager />}
+                           {view === View.ATTENDANCE && <AttendanceManager />}
+                           {view === View.EXAMS && <ExamManager />}
+                       </div>
+                  </main>
+              </div>
+          );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
   </body>
 </html>
