@@ -132,6 +132,7 @@ const StudentManager: React.FC = () => {
   // Validation State
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form Action State
   const [saveAction, setSaveAction] = useState<'SAVE' | 'SAVE_AND_NEW'>('SAVE');
@@ -163,6 +164,7 @@ const StudentManager: React.FC = () => {
       setErrors({});
       setTouched({});
       setAiReport(null);
+      setFormError(null);
   };
 
   // Helper to generate ID and Roll No
@@ -245,8 +247,8 @@ const StudentManager: React.FC = () => {
       
       case 'contactNumber':
         if (!value) return 'Contact Number is required';
-        // Indian Mobile Format Validation: Starts with 6-9 and has 10 digits
-        if (!/^[6-9]\d{9}$/.test(value)) return 'Enter a valid 10-digit Indian mobile number';
+        // Relaxed validation: 10 digits
+        if (!/^\d{10}$/.test(value)) return 'Enter a valid 10-digit mobile number';
         return '';
       
       case 'className':
@@ -266,10 +268,6 @@ const StudentManager: React.FC = () => {
         const dob = new Date(value);
         const today = new Date();
         if (dob >= today) return 'Date of Birth cannot be in the future';
-        
-        // Basic Age Check (e.g., Student must be at least 2 years old)
-        const ageDiff = today.getFullYear() - dob.getFullYear();
-        if (ageDiff < 2) return 'Student must be at least 2 years old';
         return '';
       
       case 'admissionDate':
@@ -283,7 +281,7 @@ const StudentManager: React.FC = () => {
       
       case 'address':
         if (!value || !value.trim()) return 'Address is required';
-        if (value.trim().length < 10) return 'Please enter a complete address (min 10 chars)';
+        if (value.trim().length < 5) return 'Address too short (min 5 chars)';
         return '';
       
       default:
@@ -299,6 +297,9 @@ const StudentManager: React.FC = () => {
     const newData = { ...formData, [name]: processedValue as any };
     setFormData(newData);
     
+    // Clear generic form error when user types
+    if (formError) setFormError(null);
+
     // Real-time validation if the field has been touched
     if (touched[name]) {
         setErrors(prev => ({ ...prev, [name]: validateField(name, processedValue, newData) }));
@@ -335,19 +336,25 @@ const StudentManager: React.FC = () => {
     setTouched(fieldsToValidate.reduce((acc, field) => ({...acc, [field]: true}), {}));
 
     if (!isValid) {
-        return; // Form UI displays errors, no need for alert
+        setFormError("Please fix the errors in the form before saving.");
+        return; 
     }
 
-    db.saveStudent(formData);
-    loadStudents();
-    
-    if (saveAction === 'SAVE_AND_NEW' && !isEdit) {
-        // Reset for new entry with new auto-generated ID
-        const creds = generateNewCredentials();
-        setFormData({...initialFormState, ...creds});
-        resetFormState();
-    } else {
-        setViewMode('LIST');
+    try {
+        db.saveStudent(formData);
+        loadStudents();
+        
+        if (saveAction === 'SAVE_AND_NEW' && !isEdit) {
+            // Reset for new entry with new auto-generated ID
+            const creds = generateNewCredentials();
+            setFormData({...initialFormState, ...creds});
+            resetFormState();
+        } else {
+            setViewMode('LIST');
+        }
+    } catch (err) {
+        console.error(err);
+        setFormError("Failed to save student data.");
     }
   };
 
@@ -634,13 +641,19 @@ const StudentManager: React.FC = () => {
                 <FormField 
                     label="Address" 
                     name="address" 
-                    placeholder="Full residential address (min 10 chars)" 
+                    placeholder="Full residential address (min 5 chars)" 
                     value={formData.address}
                     error={errors.address}
                     touched={touched.address}
                     onChange={handleFieldChange}
                     onBlur={handleBlur}
                 />
+
+                {formError && (
+                    <div className="col-span-1 md:col-span-2 bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-red-200 text-sm flex items-center gap-2 animate-in slide-in-from-top-2">
+                        <AlertCircle size={18} /> {formError}
+                    </div>
+                )}
 
                 <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-4 mt-4 border-t border-white/10 pt-6">
                     <button 
