@@ -49,7 +49,7 @@
 <body>
     <div id="root"></div>
     
-    <script type="text/babel" data-type="module" data-presets="env,react,typescript">
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { GoogleGenAI } from "@google/genai";
@@ -61,16 +61,17 @@ import {
 } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-// --- TYPES ---
-enum View {
-  DASHBOARD = 'DASHBOARD',
-  STUDENTS = 'STUDENTS',
-  TEACHERS = 'TEACHERS',
-  FEES = 'FEES',
-  ATTENDANCE = 'ATTENDANCE',
-  EXAMS = 'EXAMS',
-  SETTINGS = 'SETTINGS'
-}
+// --- CONSTANTS & TYPES ---
+// Defined as const object to prevent ReferenceError in Babel standalone
+const View = {
+  DASHBOARD: 'DASHBOARD',
+  STUDENTS: 'STUDENTS',
+  TEACHERS: 'TEACHERS',
+  FEES: 'FEES',
+  ATTENDANCE: 'ATTENDANCE',
+  EXAMS: 'EXAMS',
+  SETTINGS: 'SETTINGS'
+};
 
 interface Student {
   id: string;
@@ -535,7 +536,7 @@ const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose }) => {
   );
 };
 
-// 3. STUDENT MANAGER HELPERS & COMPONENT
+// 3. STUDENT MANAGER
 const CustomDatePicker = ({ label, value, onChange, error, touched }) => {
     return (
         <div className="relative">
