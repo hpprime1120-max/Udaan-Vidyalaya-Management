@@ -24,25 +24,33 @@ export const generateStudentReport = async (
     const client = getClient();
     if (!client) return "API Key is missing. Please configure the environment.";
 
-    const prompt = `
-    You are an expert academic counselor for 'Udaan Vidhyalay'.
-    Analyze the following student data and write a professional, encouraging, but honest 1-paragraph performance summary for their report card.
-    
-    Student: ${student.fullName} (Class: ${student.className}-${student.section})
+    const academicData = exams.length > 0 
+        ? exams.map(e => `- ${e.subject} (${e.examType}): ${e.marksObtained}/${e.totalMarks}`).join('\n')
+        : "No exam records available.";
+
+    const attendanceSummary = attendance.length > 0
+        ? `Total Records: ${attendance.length}, Present: ${attendance.filter(a => a.status === 'Present').length}, Absent: ${attendance.filter(a => a.status === 'Absent').length}`
+        : "No attendance records available.";
+
+    const userPrompt = `
+    Student Name: ${student.fullName}
+    Class: ${student.className}-${student.section}
     
     Academic Performance:
-    ${exams.map(e => `- ${e.subject} (${e.examType}): ${e.marksObtained}/${e.totalMarks}`).join('\n')}
+    ${academicData}
     
-    Attendance Records: ${attendance.length} records found.
-    (Assume general attendance is good unless specified otherwise).
-
-    The summary should mention their strengths based on high marks and areas for improvement based on low marks.
+    Attendance Overview:
+    ${attendanceSummary}
     `;
 
     try {
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt,
+            contents: userPrompt,
+            config: {
+                systemInstruction: "You are an expert academic counselor for 'Udaan Vidhyalay'. Analyze the student data provided (Grades and Attendance) and write a professional, encouraging, 1-paragraph performance summary suitable for a report card. Highlight strengths and suggest areas for improvement politely.",
+                temperature: 0.7,
+            }
         });
         return response.text || "No report generated.";
     } catch (error) {
@@ -70,9 +78,7 @@ export const generateAttendanceAnalysis = async (
         if(r.status === 'Absent') dateMap[r.date].A++;
     });
 
-    const prompt = `
-    You are a school administrator analyst. Analyze the following attendance data for 'Udaan Vidhyalay'.
-    
+    const userPrompt = `
     Total Records Scanned: ${records.length}
     Total Students in DB: ${totalStudents}
     
@@ -83,18 +89,16 @@ export const generateAttendanceAnalysis = async (
     
     Daily Breakdown (Sample):
     ${JSON.stringify(Object.entries(dateMap).slice(0, 5))}
-    
-    Please provide a 3-bullet point analysis:
-    1. Overall Attendance Health (Excellent/Good/Poor).
-    2. A specific observation (e.g., "High absenteeism observed on...").
-    3. One actionable suggestion for improvement.
-    Keep it concise and professional.
     `;
 
     try {
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt,
+            contents: userPrompt,
+            config: {
+                systemInstruction: "You are a school administrator analyst. Provide a concise 3-bullet point analysis of the attendance data: 1) Overall Health, 2) Specific Observation, 3) Actionable Suggestion.",
+                temperature: 0.5,
+            }
         });
         return response.text || "Analysis failed.";
     } catch (error) {

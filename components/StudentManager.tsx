@@ -402,7 +402,11 @@ const StudentManager: React.FC = () => {
           <div className="flex justify-between items-center">
             <div>
                 <h2 className="text-xl font-bold text-white">Student Directory</h2>
-                <p className="text-sm text-zinc-400">Manage records for {students.length} students</p>
+                <p className="text-sm text-zinc-400">
+                    {filteredStudents.length === students.length 
+                        ? `Total Students: ${students.length}` 
+                        : `Showing ${filteredStudents.length} of ${students.length} students`}
+                </p>
             </div>
              <div className="flex gap-2">
                  <button 
