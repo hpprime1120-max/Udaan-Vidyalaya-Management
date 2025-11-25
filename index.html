@@ -96,7 +96,7 @@ import {
   Plus, Trash2, Edit, Save, Wand2, AlertCircle, Calendar, Download, Filter, CopyPlus, RotateCcw, Search, Lock, Sparkles,
   CheckCircle, XCircle, History, ChevronDown, ChevronUp, Printer, CreditCard, Wallet, Receipt,
   BrainCircuit, UserPlus, IndianRupee, Phone, Mail, ChevronLeft, ChevronRight, Award, PieChart, Menu, Upload, FileDown,
-  Loader2, Check, FileImage, ArrowRight, User
+  Loader2, Check, FileImage
 } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -239,22 +239,14 @@ const db = new DatabaseService();
 // --- GEMINI SERVICE & HELPERS ---
 const getClient = () => {
     let apiKey = '';
-    try { 
-        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) { 
-            apiKey = process.env.API_KEY; 
-        } 
-    } catch (e) { 
-        // Ignore environment access errors in pure browser context
-    }
-    
-    // Fallback or return null if no key
+    try { if (typeof process !== 'undefined' && process.env) { apiKey = process.env.API_KEY || ''; } } catch (e) { console.warn(e); }
     if (!apiKey) return null;
     return new GoogleGenAI({ apiKey });
 }
 
 const generateStudentReport = async (student, exams, attendance) => {
     const client = getClient();
-    if (!client) return "API Key is missing or invalid configuration.";
+    if (!client) return "API Key is missing.";
     
     const academicData = exams.length > 0 
         ? exams.map(e => `- ${e.subject} (${e.examType}): ${e.marksObtained}/${e.totalMarks}`).join('\n')
@@ -301,195 +293,38 @@ const generateAttendanceAnalysis = async (records, totalStudents) => {
     } catch (error) { return "Error with AI."; }
 }
 
-// --- LOGIN COMPONENT ---
+// --- COMPONENTS ---
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  // Google Auth Simulation State
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleStandardLogin = (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
-    setError('');
-    
-    if (!username || !password) {
-        setError('Please enter Admin ID and Password');
-        return;
-    }
-
-    setLoading(true);
-    // Simulate network delay for realism
-    setTimeout(() => {
-        if (username === 'admin' && password === '1234') {
-            onLogin({
-                name: 'Administrator',
-                email: 'admin@udaan.edu',
-                role: 'ADMIN',
-                avatar: null
-            });
-        } else {
-            setError('Invalid Credentials. Try Admin ID: admin, Pass: 1234');
-            setLoading(false);
-        }
-    }, 800);
-  };
-  
-  const handleGoogleLoginStep = (account) => {
-      setGoogleLoading(true);
-      setTimeout(() => {
-          setGoogleLoading(false);
-          setShowGoogleModal(false);
-          onLogin({
-              name: account.name,
-              email: account.email,
-              role: 'ADMIN',
-              avatar: account.avatar
-          });
-      }, 1500);
+    if (username === 'admin' && password === '1234') onLogin();
+    else setError('Invalid Credentials');
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
-      <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl w-full max-w-md z-10 transition-all duration-300">
+      <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-2xl w-full max-w-md z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-300 mb-4 border border-indigo-500/30 shadow-inner">
-            <ShieldCheck size={32} />
-          </div>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-300 mb-4 border border-indigo-500/30 shadow-inner"><ShieldCheck size={32} /></div>
           <h1 className="text-3xl font-bold text-white">Udaan Vidhyalay</h1>
-          <p className="text-zinc-400 text-sm mt-2">School Management System</p>
         </div>
-        
-        <form onSubmit={handleStandardLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Admin ID</label>
-            <input 
-                type="text" 
-                value={username} 
-                onChange={e => setUsername(e.target.value)} 
-                className="block w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:ring-2 focus:ring-indigo-500 outline-none placeholder-zinc-500 transition-all" 
-                placeholder="Enter Admin ID" 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-zinc-300">Password</label>
-            <input 
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                className="block w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:ring-2 focus:ring-indigo-500 outline-none placeholder-zinc-500 transition-all" 
-                placeholder="Enter Password" 
-            />
-          </div>
-          
-          {error && (
-              <div className="text-red-300 text-sm text-center bg-red-500/10 p-2 rounded border border-red-500/20 flex items-center justify-center gap-2 animate-pulse">
-                  <AlertCircle size={14}/> {error}
-              </div>
-          )}
-          
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition shadow-lg shadow-indigo-900/30 transform active:scale-[0.98] flex justify-center items-center gap-2"
-          >
-            {loading ? <Loader2 className="animate-spin" size={20}/> : 'Secure Login'}
-          </button>
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div><label className="block text-sm font-medium text-zinc-300 mb-2">Admin ID</label><input type="text" value={username} onChange={e => setUsername(e.target.value)} className="block w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Admin ID" /></div>
+          <div><label className="block text-sm font-medium text-zinc-300 mb-2">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} className="block w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter Password" /></div>
+          {error && <div className="text-red-300 text-sm text-center">{error}</div>}
+          <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition">Secure Login</button>
         </form>
-
-        <div className="my-6 flex items-center gap-4">
-            <div className="h-px bg-white/10 flex-1"></div>
-            <div className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Or</div>
-            <div className="h-px bg-white/10 flex-1"></div>
-        </div>
-
-        <button 
-            type="button" 
-            onClick={() => setShowGoogleModal(true)}
-            className="w-full py-3 bg-white hover:bg-zinc-100 text-zinc-900 rounded-lg font-bold transition flex items-center justify-center gap-3 relative transform active:scale-[0.98]"
-        >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-            <span>Sign in with Google</span>
-        </button>
       </div>
-
-      {/* Realistic Google Auth Modal Simulation */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden animate-in zoom-in-95 duration-200">
-                {googleLoading ? (
-                    <div className="h-[400px] flex flex-col items-center justify-center p-8 space-y-4">
-                        <Loader2 className="animate-spin text-blue-600" size={48} />
-                        <p className="text-zinc-600 font-medium">Verifying Credentials...</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                             <div className="flex items-center gap-2">
-                                <svg className="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
-                                <span className="font-medium text-gray-700">Sign in with Google</span>
-                             </div>
-                             <button onClick={() => setShowGoogleModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
-                        </div>
-                        <div className="p-4">
-                            <h3 className="text-xl text-center text-gray-800 mb-2">Choose an account</h3>
-                            <p className="text-sm text-center text-gray-500 mb-6">to continue to Udaan Vidhyalay</p>
-                            
-                            <div className="space-y-2">
-                                <button 
-                                    onClick={() => handleGoogleLoginStep({name: 'Udaan Admin', email: 'admin@udaan.edu', avatar: 'https://ui-avatars.com/api/?name=Udaan+Admin&background=0D8ABC&color=fff'})}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition text-left"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">UA</div>
-                                    <div>
-                                        <div className="font-medium text-gray-900">Udaan Admin</div>
-                                        <div className="text-sm text-gray-500">admin@udaan.edu</div>
-                                    </div>
-                                </button>
-                                
-                                <button 
-                                    onClick={() => handleGoogleLoginStep({name: 'Principal Office', email: 'principal@udaan.edu', avatar: 'https://ui-avatars.com/api/?name=Principal&background=6366f1&color=fff'})}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition text-left"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold">P</div>
-                                    <div>
-                                        <div className="font-medium text-gray-900">Principal Office</div>
-                                        <div className="text-sm text-gray-500">principal@udaan.edu</div>
-                                    </div>
-                                </button>
-
-                                <div className="border-t border-gray-100 my-2"></div>
-                                
-                                <button className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition text-left text-gray-600">
-                                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><User size={20}/></div>
-                                    <div className="font-medium">Use another account</div>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-gray-100 text-xs text-gray-500 text-center">
-                            To continue, Google will share your name, email address, and language preference with Udaan Vidhyalay.
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// --- SIDEBAR COMPONENT ---
-const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose, user }) => {
+const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose }) => {
   const menuItems = [
     { id: View.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
     { id: View.STUDENTS, label: 'Students', icon: Users },
@@ -502,12 +337,11 @@ const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose, user })
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm" onClick={onClose} />}
-      <div className={`fixed top-0 left-0 h-full w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 text-white shadow-2xl z-40 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:z-20 flex flex-col`}>
+      <div className={`fixed top-0 left-0 h-full w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 text-white shadow-2xl z-40 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:z-20`}>
         <div className="p-6 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3"><div className="p-2 bg-indigo-600 rounded-lg"><School size={24} /></div><div><h2 className="font-bold text-lg">Udaan</h2><span className="text-xs text-zinc-400 uppercase">Vidhyalay</span></div></div>
           <button onClick={onClose} className="md:hidden text-zinc-400 hover:text-white"><X size={24} /></button>
         </div>
-        
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 custom-scrollbar">
           {menuItems.map(item => (
             <button key={item.id} onClick={() => { onChangeView(item.id); onClose(); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${currentView === item.id ? 'bg-indigo-600/80 text-white' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
@@ -515,32 +349,11 @@ const Sidebar = ({ currentView, onChangeView, onLogout, isOpen, onClose, user })
             </button>
           ))}
         </nav>
-        
-        {/* User Profile Section in Sidebar */}
-        <div className="p-4 border-t border-white/10 bg-black/20">
-            <div className="flex items-center gap-3 mb-3">
-                {user?.avatar ? (
-                    <img src={user.avatar} alt="User" className="w-10 h-10 rounded-full border border-white/20" />
-                ) : (
-                    <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">{user?.name?.charAt(0) || 'A'}</div>
-                )}
-                <div className="overflow-hidden">
-                    <div className="font-bold text-sm truncate">{user?.name || 'Administrator'}</div>
-                    <div className="text-xs text-zinc-400 truncate">{user?.email || 'admin@udaan.edu'}</div>
-                </div>
-            </div>
-            <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600/10 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-colors text-sm font-bold border border-red-600/20">
-                <LogOut size={16} /> Sign Out
-            </button>
-        </div>
+        <div className="p-4 border-t border-white/10"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg"><LogOut size={20} />Logout</button></div>
       </div>
     </>
   );
 };
-
-// ... [Kept StudentManager, FeesManager, AttendanceManager, ExamManager, TeacherManager unchanged as they work fine] ...
-// Re-inserting them condensed for the file, assuming they are part of the original large block.
-// Since the prompt asks for "full code" in index.html, I must include all components.
 
 // --- STUDENT MANAGER ---
 const StudentManager = () => {
@@ -552,6 +365,7 @@ const StudentManager = () => {
   const [isEdit, setIsEdit] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiReport, setAiReport] = useState(null);
+  const [errors, setErrors] = useState({});
   const [saveAction, setSaveAction] = useState('SAVE');
   const fileInputRef = useRef(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -562,8 +376,8 @@ const StudentManager = () => {
   useEffect(() => { loadStudents(); }, []);
   const loadStudents = () => { setStudents(db.getStudents()); };
   const generateNewCredentials = () => { const nextRoll = db.getNextRollNo(); return { id: `UV-${new Date().getFullYear()}-${nextRoll}`, rollNo: nextRoll }; };
-  const handleAddNew = () => { setFormData({ ...initialFormState, ...generateNewCredentials() }); setIsEdit(false); setViewMode('FORM'); setAiReport(null); };
-  const handleEdit = (student) => { setFormData(student); setIsEdit(true); setViewMode('FORM'); setAiReport(null); };
+  const handleAddNew = () => { setFormData({ ...initialFormState, ...generateNewCredentials() }); setIsEdit(false); setViewMode('FORM'); setErrors({}); setAiReport(null); };
+  const handleEdit = (student) => { setFormData(student); setIsEdit(true); setViewMode('FORM'); setErrors({}); setAiReport(null); };
   const handleDelete = (id) => { if (confirm('Delete student?')) { db.deleteStudent(id); loadStudents(); } };
   
   const handleSave = (e) => {
@@ -605,29 +419,25 @@ const StudentManager = () => {
       reader.onload = (event) => {
           try {
               const data = new Uint8Array(event.target.result);
-              if(window.XLSX) {
-                const workbook = window.XLSX.read(data, { type: 'array' });
-                const jsonData = window.XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                let imported = 0;
-                jsonData.forEach((row) => {
-                    const getVal = (k) => { const key = Object.keys(row).find(x => x.toLowerCase().includes(k.toLowerCase())); return key ? row[key] : null; };
-                    const name = getVal("Name");
-                    if (name) {
-                        const roll = db.getNextRollNo() + imported;
-                        db.saveStudent({
-                            id: `UV-${new Date().getFullYear()}-${roll}`, rollNo: roll, fullName: String(name),
-                            gender: getVal("Gender")||'Male', dateOfBirth: getVal("DOB")||'', contactNumber: String(getVal("Contact")||''),
-                            address: String(getVal("Address")||''), className: String(getVal("Class")||'1'), section: String(getVal("Section")||'A'),
-                            admissionDate: new Date().toISOString().split('T')[0]
-                        });
-                        imported++;
-                    }
-                });
-                alert(`Successfully imported ${imported} students from the file.`); 
-                loadStudents();
-              } else {
-                alert("XLSX library not loaded");
-              }
+              const workbook = window.XLSX.read(data, { type: 'array' });
+              const jsonData = window.XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+              let imported = 0;
+              jsonData.forEach((row) => {
+                  const getVal = (k) => { const key = Object.keys(row).find(x => x.toLowerCase().includes(k.toLowerCase())); return key ? row[key] : null; };
+                  const name = getVal("Name");
+                  if (name) {
+                      const roll = db.getNextRollNo() + imported;
+                      db.saveStudent({
+                          id: `UV-${new Date().getFullYear()}-${roll}`, rollNo: roll, fullName: String(name),
+                          gender: getVal("Gender")||'Male', dateOfBirth: getVal("DOB")||'', contactNumber: String(getVal("Contact")||''),
+                          address: String(getVal("Address")||''), className: String(getVal("Class")||'1'), section: String(getVal("Section")||'A'),
+                          admissionDate: new Date().toISOString().split('T')[0]
+                      });
+                      imported++;
+                  }
+              });
+              alert(`Successfully imported ${imported} students from the file.`); 
+              loadStudents();
           } catch (e) { alert("Error parsing Excel."); }
       };
       reader.readAsArrayBuffer(file);
@@ -652,11 +462,7 @@ const StudentManager = () => {
         <div className="p-4 border-b border-white/10 flex flex-wrap gap-4 justify-between items-center">
             <div>
                 <h2 className="text-xl font-bold">Student Directory</h2>
-                <p className="text-xs text-zinc-400 mt-1">
-                    {filteredStudents.length === students.length 
-                        ? `Total Students: ${students.length}` 
-                        : `Showing ${filteredStudents.length} of ${students.length} students`}
-                </p>
+                <p className="text-xs text-zinc-400 mt-1">{filteredStudents.length} Students Found</p>
             </div>
             <div className="flex gap-2">
                 <button onClick={handleDownloadTemplate} className="p-2 bg-white/5 text-zinc-300 rounded-lg text-xs flex items-center gap-1 hover:bg-white/10"><FileDown size={14}/> Template</button>
@@ -733,6 +539,8 @@ const FeesManager = () => {
   const [paymentForm, setPaymentForm] = useState({ amount: 0, mode: 'CASH', date: new Date().toISOString().split('T')[0], transactionId: '' });
   const [showReceipt, setShowReceipt] = useState(null);
   const [receiptStudent, setReceiptStudent] = useState(null);
+  
+  // NEW FILTERS
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
 
@@ -993,6 +801,8 @@ const AttendanceManager = () => {
   const [attendanceMap, setAttendanceMap] = useState({});
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // FILTERS
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
 
@@ -1189,6 +999,7 @@ const TeacherManager = () => {
     const markAttendance = (teacherId, status) => {
         const record = { id: `${teacherId}-${attendanceDate}`, teacherId, date: attendanceDate, status };
         db.saveTeacherAttendance(record);
+        // Optimistic update
         setAttendanceMap(prev => ({...prev, [teacherId]: status}));
     };
 
@@ -1336,7 +1147,7 @@ const DashboardHome = ({ stats, onNavigate }) => {
     );
 };
 
-const Dashboard = ({ onLogout, user }) => {
+const Dashboard = ({ onLogout }) => {
   const [currentView, setCurrentView] = useState(View.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ totalStudents: 0, totalTeachers: 0, totalRevenue: 0, passPercentage: 0, genderStats: { male: 0, female: 0 } });
@@ -1369,20 +1180,14 @@ const Dashboard = ({ onLogout, user }) => {
 
   return (
     <div className="flex min-h-screen bg-transparent text-zinc-100">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={onLogout} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} user={user}/>
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={onLogout} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}/>
       <main className="flex-1 p-4 md:p-8 overflow-hidden h-screen flex flex-col md:ml-64 transition-all">
         <header className="flex justify-between items-center mb-6 shrink-0">
              <div className="flex items-center gap-4">
                 <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 hover:bg-white/10 rounded-lg"><Menu size={24} /></button>
-                <div className="flex flex-col">
-                    <h1 className="text-xl md:text-2xl font-bold">{currentView === View.DASHBOARD ? 'Overview' : currentView}</h1>
-                    <span className="text-xs text-zinc-400 hidden sm:block">Welcome back, {user?.name || 'Admin'}</span>
-                </div>
+                <h1 className="text-xl md:text-2xl font-bold">{currentView === View.DASHBOARD ? 'Overview' : currentView}</h1>
              </div>
-             <div className="flex items-center gap-3">
-                 <div className="text-sm bg-black/30 px-4 py-2 rounded-full border border-white/10 hidden sm:block">{new Date().toDateString()}</div>
-                 {user?.avatar && <img src={user.avatar} className="w-8 h-8 rounded-full border border-white/20 sm:hidden" />}
-             </div>
+             <div className="text-sm bg-black/30 px-4 py-2 rounded-full border border-white/10 hidden sm:block">{new Date().toDateString()}</div>
         </header>
         <div className="flex-1 overflow-hidden relative">{renderContent()}</div>
       </main>
@@ -1391,24 +1196,11 @@ const Dashboard = ({ onLogout, user }) => {
 };
 
 const App = () => {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => { 
-      const stored = sessionStorage.getItem('uv_user');
-      if (stored) setUser(JSON.parse(stored));
-  }, []);
-
-  const login = (userData) => { 
-      sessionStorage.setItem('uv_user', JSON.stringify(userData)); 
-      setUser(userData); 
-  };
-  
-  const logout = () => { 
-      sessionStorage.removeItem('uv_user'); 
-      setUser(null); 
-  };
-
-  return user ? <Dashboard onLogout={logout} user={user} /> : <Login onLogin={login} />;
+  const [auth, setAuth] = useState(false);
+  useEffect(() => { if (sessionStorage.getItem('uv_auth') === 'true') setAuth(true); }, []);
+  const login = () => { sessionStorage.setItem('uv_auth', 'true'); setAuth(true); };
+  const logout = () => { sessionStorage.removeItem('uv_auth'); setAuth(false); };
+  return auth ? <Dashboard onLogout={logout} /> : <Login onLogin={login} />;
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
